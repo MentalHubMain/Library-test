@@ -929,6 +929,17 @@ local function BuildDropdown(section, options, theme)
         })
     end
 
+    -- Per-item select callbacks stored so Set() can call them without Fire()
+    local itemSelect = {}  -- itemSelect[opt] = function()
+
+    -- Shared close-menu helper
+    local function closeMenu()
+        open = false
+        Utility.Tween(menu, TWEEN_MED, { Size = UDim2.new(0, 160, 0, 0) })
+        task.delay(0.25, function() menu.Visible = false end)
+        Utility.Tween(arrow, TWEEN_FAST, { Rotation = 0 })
+    end
+
     -- Build items
     local itemFrames = {}
     for _, opt in ipairs(opts) do
@@ -978,31 +989,35 @@ local function BuildDropdown(section, options, theme)
             end
         end)
 
-        item.MouseButton1Click:Connect(function()
-            -- Deselect old
+        -- Build per-item select function (closure captures itemLabel, checkmark, item, opt)
+        local function doSelect()
+            -- Deselect all
             for _, f in pairs(itemFrames) do
-                local lbl = f:FindFirstChildOfClass("TextLabel")
-                local chk = f:FindFirstChild("Checkmark")
-                if lbl then lbl.TextColor3 = theme.TextPrimary end
-                if chk  then chk.Text = "" end
+                local lbls = f:GetChildren()
+                for _, c in ipairs(lbls) do
+                    if c:IsA("TextLabel") then
+                        if c.TextXAlignment == Enum.TextXAlignment.Left then
+                            c.TextColor3 = theme.TextPrimary
+                        else
+                            c.Text = ""
+                        end
+                    end
+                end
                 Utility.Tween(f, TWEEN_FAST, { BackgroundColor3 = theme.Surface2 })
             end
-
-            value = opt
+            -- Select this item
             itemLabel.TextColor3 = theme.Accent
-            checkmark.Text = "✔"
+            checkmark.Text       = "✔"
             Utility.Tween(item, TWEEN_FAST, { BackgroundColor3 = theme.Surface3 })
             ddValLabel.Text = opt
-
+            value = opt
+            closeMenu()
             if options.ConfigKey then Config.Set(options.ConfigKey, opt) end
-            if options.Callback then pcall(options.Callback, opt) end
+            if options.Callback  then pcall(options.Callback, opt) end
+        end
 
-            -- Close
-            open = false
-            Utility.Tween(menu, TWEEN_MED, { Size = UDim2.new(0, 160, 0, 0) })
-            task.delay(0.25, function() menu.Visible = false end)
-            Utility.Tween(arrow, TWEEN_FAST, { Rotation = 0 })
-        end)
+        itemSelect[opt] = doSelect
+        item.MouseButton1Click:Connect(doSelect)
 
         itemFrames[opt] = item
     end
@@ -1057,7 +1072,9 @@ local function BuildDropdown(section, options, theme)
 
     local dropObj = {}
     function dropObj:Set(v)
-        if itemFrames[v] then itemFrames[v].MouseButton1Click:Fire() end
+        if itemSelect[v] then
+            itemSelect[v]()
+        end
     end
     function dropObj:Get() return value end
     function dropObj:Refresh(newOpts)
@@ -2658,6 +2675,7 @@ function SX:CreateWindow(options)
         tabObj._activeLine = activeLine
         tabObj._label      = tabLabel
         tabObj._name       = tabTitle
+        tabObj._select     = selectTab   -- store function ref for search bar
         table.insert(tabs, tabObj)
 
         -- Auto-select first tab
@@ -2682,7 +2700,7 @@ function SX:CreateWindow(options)
         if q == "" then return end
         for _, t in pairs(tabs) do
             if t._name:lower():find(q, 1, true) then
-                t._btn.MouseButton1Click:Fire()
+                if t._select then t._select() end
                 break
             end
         end
