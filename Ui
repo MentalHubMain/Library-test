@@ -689,11 +689,12 @@ local function BuildSlider(section, options, theme)
     })
     Utility.AddCorner(fill, UDim.new(1, 0))
 
-    -- Thumb
+    -- Thumb (AnchorPoint 0.5,0.5 keeps it centered on the track line)
     local thumb = Utility.Create("Frame", {
         Name              = "Thumb",
         Size              = UDim2.new(0, 16, 0, 16),
-        Position          = UDim2.new(pct, -8, 0.5, -8),
+        AnchorPoint       = Vector2.new(0.5, 0.5),
+        Position          = UDim2.new(pct, 0, 0.5, 0),
         BackgroundColor3  = theme.Accent,
         ZIndex            = 4,
         Parent            = track,
@@ -726,7 +727,7 @@ local function BuildSlider(section, options, theme)
         value = snap(v)
         local p = (value - min) / (max - min)
         Utility.Tween(fill,  TWEEN_FAST, { Size     = UDim2.new(p, 0, 1, 0) })
-        Utility.Tween(thumb, TWEEN_FAST, { Position = UDim2.new(p, -8, 0.5, -8) })
+        Utility.Tween(thumb, TWEEN_FAST, { Position = UDim2.new(p, 0, 0.5, 0) })
         valLabel.Text = tostring(value) .. suffix
         if options.ConfigKey then Config.Set(options.ConfigKey, value) end
         if options.Callback then pcall(options.Callback, value) end
@@ -800,7 +801,7 @@ local function BuildDropdown(section, options, theme)
         BackgroundColor3  = theme.Surface,
         BackgroundTransparency = 1,
         ClipsDescendants  = false,
-        ZIndex            = 1,
+        ZIndex            = 5,
         Parent            = section,
     })
 
@@ -855,7 +856,7 @@ local function BuildDropdown(section, options, theme)
         Parent            = ddBtn,
     })
 
-    -- Menu frame (sits below button, uses ZIndex to float over content)
+    -- Menu frame (high ZIndex so it floats over sibling rows)
     local menuH = math.min(#opts, 5) * ITEM_H + SEARCH_H + 4
     local menu = Utility.Create("Frame", {
         Name              = "Menu",
@@ -863,7 +864,7 @@ local function BuildDropdown(section, options, theme)
         Position          = UDim2.new(1, -theme.Padding - 160, 0, theme.RowHeight),
         BackgroundColor3  = theme.Surface2,
         ClipsDescendants  = true,
-        ZIndex            = 20,
+        ZIndex            = 50,
         Visible           = false,
         Parent            = row,
     })
@@ -1107,7 +1108,7 @@ local function BuildMultiDropdown(section, options, theme)
         Size              = UDim2.new(1, 0, 0, theme.RowHeight),
         BackgroundTransparency = 1,
         ClipsDescendants  = false,
-        ZIndex            = 1,
+        ZIndex            = 5,
         Parent            = section,
     })
 
@@ -1167,7 +1168,7 @@ local function BuildMultiDropdown(section, options, theme)
         Position          = UDim2.new(1, -theme.Padding - 160, 0, theme.RowHeight),
         BackgroundColor3  = theme.Surface2,
         ClipsDescendants  = true,
-        ZIndex            = 20,
+        ZIndex            = 50,
         Visible           = false,
         Parent            = row,
     })
@@ -1672,14 +1673,14 @@ local function BuildColorPicker(section, options, theme)
     Utility.AddCorner(swatch, theme.CornerSm)
     Utility.AddStroke(swatch, theme.Border2, 1)
 
-    -- Picker popup (hue/saturation/value, simplified HSV picker)
+    -- Picker popup (high ZIndex so it floats above other elements)
     local picker = Utility.Create("Frame", {
         Name              = "Picker",
         Size              = UDim2.new(0, 200, 0, 160),
         Position          = UDim2.new(1, -theme.Padding - 200, 0, theme.RowHeight),
         BackgroundColor3  = theme.Surface2,
         ClipsDescendants  = true,
-        ZIndex            = 30,
+        ZIndex            = 50,
         Visible           = false,
         Parent            = row,
     })
@@ -1977,6 +1978,7 @@ local function BuildSection(contentFrame, options, theme)
         AutomaticSize     = Enum.AutomaticSize.Y,
         BackgroundColor3  = theme.Surface,
         BackgroundTransparency = 0,
+        ClipsDescendants  = false,
         Parent            = contentFrame,
     })
     Utility.AddCorner(container, theme.CornerRadius)
@@ -2009,7 +2011,6 @@ local function BuildSection(contentFrame, options, theme)
         TextSize          = 11,
         Font              = Enum.Font.GothamBold,
         TextXAlignment    = Enum.TextXAlignment.Left,
-        LetterSpacing     = 2,
         Parent            = header,
     })
 
@@ -2080,7 +2081,7 @@ local function BuildTab(tabBtn, tabFrame, theme)
     Tab._frame = tabFrame
     Tab._theme = theme
 
-    -- Content scroll frame
+    -- Content scroll frame (ClipsDescendants false so dropdown menus can overflow)
     local scroll = Utility.Create("ScrollingFrame", {
         Name              = "Scroll",
         Size              = UDim2.new(1, 0, 1, 0),
@@ -2089,6 +2090,7 @@ local function BuildTab(tabBtn, tabFrame, theme)
         ScrollBarThickness = 3,
         ScrollBarImageColor3 = theme.Accent,
         ScrollBarImageTransparency = 0.5,
+        ClipsDescendants  = false,
         Parent            = tabFrame,
     })
     Utility.AddListLayout(scroll, Enum.FillDirection.Vertical, UDim.new(0, 8))
@@ -2447,33 +2449,32 @@ function SX:CreateWindow(options)
     Utility.AddCorner(contentArea, theme.CornerLg)
 
     -- ─── WINDOW STATE ─────────────────────────────────────────────
-    local visible  = true
+    local visible   = true
     local minimized = false
-
-    local function setVisible(v)
-        visible = v
-        Utility.Tween(window, TWEEN_MED, {
-            BackgroundTransparency = v and 0 or 1,
-            Size = v and UDim2.new(0, winSize.X, 0, winSize.Y)
-                     or  UDim2.new(0, winSize.X, 0, theme.TitlebarHeight),
-        })
-        titlebar.Visible = true
-    end
 
     minimizeBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
-        Utility.Tween(window, TWEEN_MED, {
-            Size = minimized
-                and UDim2.new(0, winSize.X, 0, theme.TitlebarHeight)
-                or  UDim2.new(0, winSize.X, 0, winSize.Y),
-        })
+        if minimized then
+            sidebar.Visible     = false
+            contentArea.Visible = false
+            Utility.Tween(window, TWEEN_MED, {
+                Size = UDim2.new(0, winSize.X, 0, theme.TitlebarHeight),
+            })
+        else
+            Utility.Tween(window, TWEEN_MED, {
+                Size = UDim2.new(0, winSize.X, 0, winSize.Y),
+            })
+            task.delay(0.26, function()
+                sidebar.Visible     = true
+                contentArea.Visible = true
+            end)
+        end
     end)
 
     hideBtn.MouseButton1Click:Connect(function()
         visible = false
-        Utility.Tween(window, TWEEN_MED, { BackgroundTransparency = 1,
-            Size = UDim2.new(0, 0, 0, 0) })
-        task.delay(0.3, function() window.Visible = false end)
+        Utility.Tween(window, TWEEN_MED, { BackgroundTransparency = 1 })
+        task.delay(0.26, function() window.Visible = false end)
         NotifLib.Notify({
             Title   = "Hub Hidden",
             Message = "Press " .. toggleKey.Name .. " to reopen.",
@@ -2485,10 +2486,7 @@ function SX:CreateWindow(options)
     closeBtn.MouseButton1Click:Connect(function()
         NotifLib.Notify({ Title = "Unloading...", Message = "SpeedX Hub is shutting down.", Type = "warn", Duration = 2 })
         task.delay(0.5, function()
-            Utility.Tween(window, TWEEN_SLOW, {
-                BackgroundTransparency = 1,
-                Size = UDim2.new(0, 0, 0, 0),
-            })
+            Utility.Tween(window, TWEEN_SLOW, { BackgroundTransparency = 1 })
             task.delay(0.45, function() gui:Destroy() end)
         end)
     end)
@@ -2499,51 +2497,60 @@ function SX:CreateWindow(options)
         if input.KeyCode == toggleKey then
             if not visible then
                 visible = true
+                -- If it was minimized, restore fully
+                if minimized then
+                    minimized = false
+                    sidebar.Visible     = true
+                    contentArea.Visible = true
+                    window.Size = UDim2.new(0, winSize.X, 0, winSize.Y)
+                end
                 window.Visible = true
-                Utility.Tween(window, TWEEN_SPRING, {
-                    BackgroundTransparency = 0,
-                    Size = UDim2.new(0, winSize.X, 0, winSize.Y),
-                })
+                Utility.Tween(window, TWEEN_SPRING, { BackgroundTransparency = 0 })
             else
                 visible = false
-                Utility.Tween(window, TWEEN_MED, {
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(0, 0, 0, 0),
-                })
-                task.delay(0.3, function() window.Visible = false end)
+                Utility.Tween(window, TWEEN_MED, { BackgroundTransparency = 1 })
+                task.delay(0.26, function() window.Visible = false end)
             end
         end
     end)
 
     -- ─── WINDOW DRAGGING ──────────────────────────────────────────
     do
-        local dragging = false
-        local dragStart, startPos
+        local dragging  = false
+        local dragStart = Vector2.new(0, 0)
+        local winStartX = 0
+        local winStartY = 0
 
         titlebar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or
                input.UserInputType == Enum.UserInputType.Touch then
-                dragging  = true
-                dragStart = input.Position
-                startPos  = window.Position
+                -- Snap to pixel-based positioning on first drag
+                local absPos = window.AbsolutePosition
+                winStartX   = absPos.X
+                winStartY   = absPos.Y
+                dragStart   = Vector2.new(input.Position.X, input.Position.Y)
+                dragging    = true
+                -- Switch away from scale-based so delta math is exact
+                window.AnchorPoint = Vector2.new(0, 0)
+                window.Position    = UDim2.new(0, winStartX, 0, winStartY)
             end
         end)
 
-        titlebar.InputEnded:Connect(function(input)
+        UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or
                input.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
             end
         end)
 
-        RunService.RenderStepped:Connect(function()
+        RunService.Heartbeat:Connect(function()
             if not dragging then return end
-            local pos  = UserInputService:GetMouseLocation()
-            local delta = pos - Vector2.new(dragStart.X, dragStart.Y)
-            window.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
+            local pos      = UserInputService:GetMouseLocation()
+            local delta    = pos - dragStart
+            local scrSize  = workspace.CurrentCamera.ViewportSize
+            local newX = math.clamp(winStartX + delta.X, 0, scrSize.X - window.AbsoluteSize.X)
+            local newY = math.clamp(winStartY + delta.Y, 0, scrSize.Y - theme.TitlebarHeight)
+            window.Position = UDim2.new(0, newX, 0, newY)
         end)
     end
 
@@ -2619,21 +2626,19 @@ function SX:CreateWindow(options)
         local tabObj = BuildTab(tabBtn, tabFrame, theme)
 
         local function selectTab()
-            -- Deactivate others
+            -- Deactivate all tabs using stored refs
             for _, t in pairs(tabs) do
                 t._frame.Visible = false
-                t._btn.BackgroundTransparency = 1
-                local al = t._btn:FindFirstChild("ActiveLine") or t._btn:FindFirstChildOfClass("Frame")
-                if al then Utility.Tween(al, TWEEN_FAST, { BackgroundTransparency = 1 }) end
-                local lbl = t._btn:FindFirstChildOfClass("TextLabel")
-                if lbl then Utility.Tween(lbl, TWEEN_FAST, { TextColor3 = theme.TextSecondary }) end
+                Utility.Tween(t._btn,        TWEEN_FAST, { BackgroundTransparency = 1 })
+                Utility.Tween(t._activeLine, TWEEN_FAST, { BackgroundTransparency = 1 })
+                Utility.Tween(t._label,      TWEEN_FAST, { TextColor3 = theme.TextSecondary })
             end
-            -- Activate this
+            -- Activate this tab
             tabFrame.Visible = true
-            Utility.Tween(tabBtn, TWEEN_FAST, { BackgroundTransparency = 0.92 })
-            tabBtn.BackgroundColor3 = Color3.fromRGB(255,255,255)
+            Utility.Tween(tabBtn,     TWEEN_FAST, { BackgroundTransparency = 0.88 })
+            tabBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             Utility.Tween(activeLine, TWEEN_FAST, { BackgroundTransparency = 0 })
-            Utility.Tween(tabLabel, TWEEN_FAST, { TextColor3 = theme.TextPrimary })
+            Utility.Tween(tabLabel,   TWEEN_FAST, { TextColor3 = theme.TextPrimary })
             activeTab = tabObj
         end
 
@@ -2649,8 +2654,10 @@ function SX:CreateWindow(options)
             end
         end)
 
-        tabObj._btn  = tabBtn
-        tabObj._name = tabTitle
+        tabObj._btn        = tabBtn
+        tabObj._activeLine = activeLine
+        tabObj._label      = tabLabel
+        tabObj._name       = tabTitle
         table.insert(tabs, tabObj)
 
         -- Auto-select first tab
